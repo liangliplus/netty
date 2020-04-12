@@ -52,6 +52,7 @@ import java.util.concurrent.atomic.AtomicLong;
 /**
  * {@link SingleThreadEventLoop} implementation which register the {@link Channel}'s to a
  * {@link Selector} and so does the multi-plexing of these in the event loop.
+ * NioEventLoop 具体的执行者，父类 io.netty.util.concurrent.SingleThreadEventExecutor 与java 的thread 绑定在一起（成员变量）
  *
  */
 public final class NioEventLoop extends SingleThreadEventLoop {
@@ -113,6 +114,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
      */
     private Selector selector;
     private Selector unwrappedSelector;
+    //禁用迭代，size，containe等方法，使用for循环遍历，每次获取到把对应数组下标设为null，相对于NIO每次需要remove，好像简化勒
     private SelectedSelectionKeySet selectedKeys;
 
     private final SelectorProvider provider;
@@ -210,6 +212,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
             @Override
             public Object run() {
                 try {
+                    //通过反射获取到NIO selectedKeys 和 publicSelectedKeys保存在netty 自定义的 SelectedSelectionKeySet
                     Field selectedKeysField = selectorImplClass.getDeclaredField("selectedKeys");
                     Field publicSelectedKeysField = selectorImplClass.getDeclaredField("publicSelectedKeys");
 
@@ -438,6 +441,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
             try {
                 int strategy;
                 try {
+                    //目前这里调用selectNow
                     strategy = selectStrategy.calculateStrategy(selectNowSupplier, hasTasks());
                     switch (strategy) {
                     case SelectStrategy.CONTINUE:
@@ -453,6 +457,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
                         }
                         nextWakeupNanos.set(curDeadlineNanos);
                         try {
+                            //select 空轮询处理
                             if (!hasTasks()) {
                                 strategy = select(curDeadlineNanos);
                             }
@@ -572,6 +577,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
     }
 
     private void processSelectedKeys() {
+        //有事件到达勒
         if (selectedKeys != null) {
             processSelectedKeysOptimized();
         } else {
@@ -640,6 +646,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
     private void processSelectedKeysOptimized() {
         for (int i = 0; i < selectedKeys.size; ++i) {
             final SelectionKey k = selectedKeys.keys[i];
+            //当channel 为null 和 对应selectedKeys.keys[i] 需要被GC
             // null out entry in the array to allow to have it GC'ed once the Channel close
             // See https://github.com/netty/netty/issues/2363
             selectedKeys.keys[i] = null;
@@ -667,6 +674,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
 
     private void processSelectedKey(SelectionKey k, AbstractNioChannel ch) {
         final AbstractNioChannel.NioUnsafe unsafe = ch.unsafe();
+        //不是失效的，我们在NIO处理也应该判断key是否失效
         if (!k.isValid()) {
             final EventLoop eventLoop;
             try {
@@ -689,6 +697,8 @@ public final class NioEventLoop extends SingleThreadEventLoop {
         }
 
         try {
+            //netty 的实现是自己获取readyOps 然后调用Selection.OP_XXX  自己求是否对应事件可处理
+            // 因为通过java 的key，每次会调用readyOps，这样做readyOps 只会调用一次
             int readyOps = k.readyOps();
             // We first need to call finishConnect() before try to trigger a read(...) or write(...) as otherwise
             // the NIO JDK channel implementation may throw a NotYetConnectedException.
@@ -696,6 +706,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
                 // remove OP_CONNECT as otherwise Selector.select(..) will always return without blocking
                 // See https://github.com/netty/netty/issues/924
                 int ops = k.interestOps();
+                //取非对应的connect 事件的位变为0勒，读和写事件位为1，相当于注册读写事件，可以通过register(selector,SelectionKey.OP_READ | SelectionKey.OP_WRITER)
                 ops &= ~SelectionKey.OP_CONNECT;
                 k.interestOps(ops);
 
@@ -711,6 +722,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
             // Also check for readOps of 0 to workaround possible JDK bug which may otherwise lead
             // to a spin loop
             if ((readyOps & (SelectionKey.OP_READ | SelectionKey.OP_ACCEPT)) != 0 || readyOps == 0) {
+                //接受客户端连接或者可读，注意NIOServerSocketChannel 的unsafe 为NioMessageUnsafe
                 unsafe.read();
             }
         } catch (CancelledKeyException ignored) {

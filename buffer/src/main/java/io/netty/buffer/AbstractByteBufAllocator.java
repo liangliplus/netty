@@ -151,6 +151,7 @@ public abstract class AbstractByteBufAllocator implements ByteBufAllocator {
 
     @Override
     public ByteBuf heapBuffer() {
+        //默认初始大小256，最大Integer.MAX_VALUE
         return heapBuffer(DEFAULT_INITIAL_CAPACITY, DEFAULT_MAX_CAPACITY);
     }
 
@@ -165,6 +166,7 @@ public abstract class AbstractByteBufAllocator implements ByteBufAllocator {
             return emptyBuf;
         }
         validate(initialCapacity, maxCapacity);
+        //抽象方法，让具体子类实现
         return newHeapBuffer(initialCapacity, maxCapacity);
     }
 

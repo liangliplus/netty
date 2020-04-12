@@ -100,7 +100,11 @@ public abstract class ChannelInitializer<C extends Channel> extends ChannelInbou
     }
 
     /**
-     * {@inheritDoc} If override this method ensure you call super!
+     * {@inheritDoc} If override this method ensure you call super!  如果重写这个方法确保调用父类的handlerAdded，保证initChannel正常执行
+     * 对于channelInitializer 的handlerAdded 主要调用initChannel 在pipeline中添加我们handler，并移除自身
+     * Head <--> context/channelInitializer <--> tail
+     * Head <--> context/channelInitializer   <-->  context/handlerA   <-->  context/handlerB   <--> tail
+     * Head <-->   context/handlerA   <-->  context/handlerB   <--> tail
      */
     @Override
     public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
@@ -133,7 +137,9 @@ public abstract class ChannelInitializer<C extends Channel> extends ChannelInbou
                 exceptionCaught(ctx, cause);
             } finally {
                 ChannelPipeline pipeline = ctx.pipeline();
+                //判断当前的handler是否在context 中
                 if (pipeline.context(this) != null) {
+                    //channelHandler remove调也可以重写remove 方法做点事情
                     pipeline.remove(this);
                 }
             }

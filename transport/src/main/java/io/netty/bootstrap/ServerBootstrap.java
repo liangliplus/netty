@@ -142,7 +142,9 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
         }
         final Entry<AttributeKey<?>, Object>[] currentChildAttrs = childAttrs.entrySet().toArray(EMPTY_ATTRIBUTE_ARRAY);
 
+        //把channelInitializer 添加到pipeline（pipeline 持有一个双向链表），如果自己有为NioserverSocketchannel 配置handler 配置会先添加我们的channelInitializer
         p.addLast(new ChannelInitializer<Channel>() {
+            //当通过pipeline 执行task 的handlerAdded 方法，后会调用我们initChannel 方法
             @Override
             public void initChannel(final Channel ch) {
                 final ChannelPipeline pipeline = ch.pipeline();
@@ -154,6 +156,8 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
                 ch.eventLoop().execute(new Runnable() {
                     @Override
                     public void run() {
+                        //添加一个acceptor接受客户端请求，并重写channelRead方法,什么时候接受请求
+                        //这里ch 为NioServerSocketChannel，  currentChildGroup 为workgroup，currentChildHandler childHandler
                         pipeline.addLast(new ServerBootstrapAcceptor(
                                 ch, currentChildGroup, currentChildHandler, currentChildOptions, currentChildAttrs));
                     }
@@ -183,6 +187,7 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
         private final Entry<AttributeKey<?>, Object>[] childAttrs;
         private final Runnable enableAutoReadTask;
 
+        //注意该类重写的channelRead，当客户端连接，会通过pipeline 调用到
         ServerBootstrapAcceptor(
                 final Channel channel, EventLoopGroup childGroup, ChannelHandler childHandler,
                 Entry<ChannelOption<?>, Object>[] childOptions, Entry<AttributeKey<?>, Object>[] childAttrs) {
@@ -204,17 +209,24 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
             };
         }
 
+        //channel 可读，表示接受到客户端连接服务端勒
         @Override
         @SuppressWarnings("unchecked")
         public void channelRead(ChannelHandlerContext ctx, Object msg) {
+            // Channel 是一个NioSocketChannel
             final Channel child = (Channel) msg;
 
+            //注意每一个channel 都持有一个pipeline， 这里封装称task
             child.pipeline().addLast(childHandler);
 
             setChannelOptions(child, childOptions, logger);
             setAttributes(child, childAttrs);
 
             try {
+                //workgroup.register
+                //register 调用unsafe，调用register 0， 通过eventLoop 调用handlerAdded方法，调用自定义channelInitializer 的initChannel
+                // TODO 在NIO中 我们每次操作完会注册读或者 写事件在哪里做
+                // 在工作线程上注册channel 的I/O
                 childGroup.register(child).addListener(new ChannelFutureListener() {
                     @Override
                     public void operationComplete(ChannelFuture future) throws Exception {

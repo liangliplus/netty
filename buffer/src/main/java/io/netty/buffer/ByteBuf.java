@@ -244,6 +244,7 @@ import java.nio.charset.UnsupportedCharsetException;
  *
  * Please refer to {@link ByteBufInputStream} and
  * {@link ByteBufOutputStream}.
+ * int 4字节，，short 2字节 ，8字节 long
  */
 public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
 
@@ -404,12 +405,14 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
     public abstract ByteBuf setIndex(int readerIndex, int writerIndex);
 
     /**
+     * 返回可读的字节数， writerIndex - readerIndex表示可读区间
      * Returns the number of readable bytes which is equal to
      * {@code (this.writerIndex - this.readerIndex)}.
      */
     public abstract int readableBytes();
 
     /**
+     * 返回一个可写区间数字 可写的区间capacity - writerIndex
      * Returns the number of writable bytes which is equal to
      * {@code (this.capacity - this.writerIndex)}.
      */
@@ -503,6 +506,7 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
     public abstract ByteBuf resetWriterIndex();
 
     /**
+     * 可丢弃的字节在0 和 readderIndex之间
      * Discards the bytes between the 0th index and {@code readerIndex}.
      * It moves the bytes between {@code readerIndex} and {@code writerIndex}
      * to the 0th index, and sets {@code readerIndex} and {@code writerIndex}
@@ -521,6 +525,7 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
     public abstract ByteBuf discardSomeReadBytes();
 
     /**
+     * 扩容容量可写容量
      * Expands the buffer {@link #capacity()} to make sure the number of
      * {@linkplain #writableBytes() writable bytes} is equal to or greater than the
      * specified value.  If there are enough writable bytes in this buffer, this method
@@ -1360,6 +1365,7 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
     public abstract boolean readBoolean();
 
     /**
+     * 获取1字节在当前readerIndex 和 尾readerIndex 增加1
      * Gets a byte at the current {@code readerIndex} and increases
      * the {@code readerIndex} by {@code 1} in this buffer.
      *

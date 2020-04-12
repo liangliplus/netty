@@ -131,6 +131,7 @@ public class NioServerSocketChannel extends AbstractNioMessageChannel
     @Override
     protected void doBind(SocketAddress localAddress) throws Exception {
         if (PlatformDependent.javaVersion() >= 7) {
+            //注意是绑定的时候指定半连接队列 backLog
             javaChannel().bind(localAddress, config.getBacklog());
         } else {
             javaChannel().socket().bind(localAddress, config.getBacklog());
@@ -144,10 +145,14 @@ public class NioServerSocketChannel extends AbstractNioMessageChannel
 
     @Override
     protected int doReadMessages(List<Object> buf) throws Exception {
+
+        //通过accpet 拿到java 客户端channel，在这个通道上对客户端操作
         SocketChannel ch = SocketUtils.accept(javaChannel());
 
         try {
             if (ch != null) {
+                //注意 创建一个netty 客户端 NioSocketChannel，parent 为this （NioServerSocketChannel）
+                //ch 为客户端channel，创建过程即使初始化pipeLine，unsafe等，后续在服务端的AcceptorHandler 中为把channel注册到eventLoop的selector上
                 buf.add(new NioSocketChannel(this, ch));
                 return 1;
             }

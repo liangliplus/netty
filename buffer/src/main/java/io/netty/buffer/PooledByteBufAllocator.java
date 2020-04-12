@@ -92,7 +92,8 @@ public class PooledByteBufAllocator extends AbstractByteBufAllocator implements 
          * We use 2 * available processors by default to reduce contention as we use 2 * available processors for the
          * number of EventLoops in NIO and EPOLL as well. If we choose a smaller number we will run into hot spots as
          * allocation and de-allocation needs to be synchronized on the PoolArena.
-         *
+         * 如果分配较少的数字，在PoolArena分配和do-allocation 需要  同步，这也是为什么和EventLoop数量一样，减少同步带来的等待问题 ？
+         * 可以借鉴 我们可以把属性配置 放在一个专门类 处理，然后需要动态变化的默认值通过静态代码块初始化 ，比如 SystemPropertyUtil,定义几个获取不同类型的方法
          * See https://github.com/netty/netty/issues/3888.
          */
         final int defaultMinNumArena = NettyRuntime.availableProcessors() * 2;
@@ -191,13 +192,14 @@ public class PooledByteBufAllocator extends AbstractByteBufAllocator implements 
     private final PoolThreadLocalCache threadCache;
     private final int chunkSize;
     private final PooledByteBufAllocatorMetric metric;
-
+    //默认不是堆外内存
     public PooledByteBufAllocator() {
         this(false);
     }
 
     @SuppressWarnings("deprecation")
     public PooledByteBufAllocator(boolean preferDirect) {
+        //DEFAULT_NUM_HEAP_ARENA，DEFAULT_NUM_DIRECT_ARENA= CPU * 2， DEFAULT_PAGE_SIZE=8192 ，DEFAULT_MAX_ORDER = 11
         this(preferDirect, DEFAULT_NUM_HEAP_ARENA, DEFAULT_NUM_DIRECT_ARENA, DEFAULT_PAGE_SIZE, DEFAULT_MAX_ORDER);
     }
 
@@ -213,6 +215,7 @@ public class PooledByteBufAllocator extends AbstractByteBufAllocator implements 
     @Deprecated
     public PooledByteBufAllocator(boolean preferDirect, int nHeapArena, int nDirectArena, int pageSize, int maxOrder) {
         this(preferDirect, nHeapArena, nDirectArena, pageSize, maxOrder,
+                //512 254 64
                 DEFAULT_TINY_CACHE_SIZE, DEFAULT_SMALL_CACHE_SIZE, DEFAULT_NORMAL_CACHE_SIZE);
     }
 
@@ -239,7 +242,7 @@ public class PooledByteBufAllocator extends AbstractByteBufAllocator implements 
     public PooledByteBufAllocator(boolean preferDirect, int nHeapArena, int nDirectArena, int pageSize, int maxOrder,
                                   int tinyCacheSize, int smallCacheSize, int normalCacheSize,
                                   boolean useCacheForAllThreads, int directMemoryCacheAlignment) {
-        super(preferDirect);
+        super(preferDirect);//preferDirect 根据这个判断是否使用堆外内存
         threadCache = new PoolThreadLocalCache(useCacheForAllThreads);
         this.tinyCacheSize = tinyCacheSize;
         this.smallCacheSize = smallCacheSize;
@@ -262,6 +265,7 @@ public class PooledByteBufAllocator extends AbstractByteBufAllocator implements 
         int pageShifts = validateAndCalculatePageShifts(pageSize);
 
         if (nHeapArena > 0) {
+            //heapArenas 实际保存元素   PoolArena.HeapArena
             heapArenas = newArenaArray(nHeapArena);
             List<PoolArenaMetric> metrics = new ArrayList<PoolArenaMetric>(heapArenas.length);
             for (int i = 0; i < heapArenas.length; i ++) {

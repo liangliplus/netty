@@ -228,7 +228,7 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
     }
 
     /**
-     * Create a new {@link Channel} and bind it.
+     * 创建一个channel 并绑定它
      */
     public ChannelFuture bind() {
         validate();
@@ -268,6 +268,15 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
         return doBind(ObjectUtil.checkNotNull(localAddress, "localAddress"));
     }
 
+    /**
+     * initAndRegister
+     *  newChannel 创建channel对象  和 init 初始化预设参数
+     *  register 注册到java 的selector 上
+     * doBind0 绑定目标端口
+     *
+     * @param localAddress
+     * @return
+     */
     private ChannelFuture doBind(final SocketAddress localAddress) {
         final ChannelFuture regFuture = initAndRegister();
         final Channel channel = regFuture.channel();
@@ -307,7 +316,11 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
     final ChannelFuture initAndRegister() {
         Channel channel = null;
         try {
+            //channelFactory就是ReflectiveChannelFactory，通过它反射构造指定channel对象
+            //已NioSocketChannel为例，默认构造函数创建NioSocketChannelConfig，保存channel配置信息
+            //创建默认 unsafe， pipeline和 java 的socket
             channel = channelFactory.newChannel();
+            //抽象方法 ，比如客户端和服务端init逻辑不一致，客户端启动时就要添加channelInitializer，服务端启动是为pipeline 添加Acceptor
             init(channel);
         } catch (Throwable t) {
             if (channel != null) {
@@ -320,6 +333,8 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
             return new DefaultChannelPromise(new FailedChannel(), GlobalEventExecutor.INSTANCE).setFailure(t);
         }
 
+        //group 为 MultithreadEventLoopGroup，register 方法调用next.register next 会通过类似%的方法获取一个数组下标的EventLoop
+        //next为  SingleThreadEventLoop.register 方法 传入 channel ，channel 持有unsafe（netty 具体I/O操作处理） ， pipeline （管道）
         ChannelFuture regFuture = config().group().register(channel);
         if (regFuture.cause() != null) {
             if (channel.isRegistered()) {
@@ -352,7 +367,9 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
         channel.eventLoop().execute(new Runnable() {
             @Override
             public void run() {
+                //注意在register0中会设置为success
                 if (regFuture.isSuccess()) {
+                    //底层还是通过unsafe 和 javaNIO的 serverSocketChannel 打交道
                     channel.bind(localAddress, promise).addListener(ChannelFutureListener.CLOSE_ON_FAILURE);
                 } else {
                     promise.setFailure(regFuture.cause());

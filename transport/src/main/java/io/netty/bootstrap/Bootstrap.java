@@ -105,6 +105,10 @@ public class Bootstrap extends AbstractBootstrap<Bootstrap, Channel> {
 
     /**
      * Connect a {@link Channel} to the remote peer.
+     * 分析勒 EventLoop的创建过程
+     * 从connect 分析勒 channel 的创建,init 对netty中pipeLine 进行赋值和channelInitializer的变化 和 option，attr
+     * register（通过channel 和EventLoop 建立关系，本质即使把javachannel 注册到 selector 上 ）
+     * 通过doConnect 连接远端，从链表尾开始遍历outbound，最后通过HeadContext ,unsafe 连接，最后底层通过NIO socketChannel.connect(interAddress)
      */
     public ChannelFuture connect() {
         validate();

@@ -89,13 +89,17 @@ public class DefaultChannelPipeline implements ChannelPipeline {
      */
     private boolean registered;
 
+    /**
+     * 维护一个类型为AbstractChannelHandlerContext的双向链表
+     * @param channel
+     */
     protected DefaultChannelPipeline(Channel channel) {
         this.channel = ObjectUtil.checkNotNull(channel, "channel");
         succeededFuture = new SucceededChannelFuture(channel, null);
         voidPromise =  new VoidChannelPromise(channel, true);
 
-        tail = new TailContext(this);
-        head = new HeadContext(this);
+        tail = new TailContext(this);//inbound
+        head = new HeadContext(this);//即使inbound 又是outbound ，这样设计目的无非两种职能，也具备out作用 ，比如connect，bind
 
         head.next = tail;
         tail.prev = head;
@@ -195,6 +199,19 @@ public class DefaultChannelPipeline implements ChannelPipeline {
         return addLast(null, name, handler);
     }
 
+    /**
+     * checkMultiplicity 校验是否存在名称相同的handler
+     * newContext 构建一个默认的DefaultChannelHandlerContext 继承抽象，保存pipeLine，handler ，executionMask 等几个重要属性
+     * addLast0  把当前的context 维护到尾节点前一个
+     * 如果register 为false，表示channel 还没有在eventLoop selector  上注册 @link{io.netty.channel.AbstractChannel.AbstractUnsafe#register0(io.netty.channel.ChannelPromise)}
+     * ，设置状态和把它添加到任务（PendingHandlerAddedTask）后返回
+     * @param group    the {@link EventExecutorGroup} which will be used to execute the {@link ChannelHandler}
+     *                 methods
+     * @param name     the name of the handler to append
+     * @param handler  the handler to append
+     *
+     * @return
+     */
     @Override
     public final ChannelPipeline addLast(EventExecutorGroup group, String name, ChannelHandler handler) {
         final AbstractChannelHandlerContext newCtx;
@@ -215,6 +232,7 @@ public class DefaultChannelPipeline implements ChannelPipeline {
             }
 
             EventExecutor executor = newCtx.executor();
+            //通过eventLoop 执行handlerAdd
             if (!executor.inEventLoop()) {
                 callHandlerAddedInEventLoop(newCtx, executor);
                 return this;
@@ -647,6 +665,7 @@ public class DefaultChannelPipeline implements ChannelPipeline {
             firstRegistration = false;
             // We are now registered to the EventLoop. It's time to call the callbacks for the ChannelHandlers,
             // that were added before the registration was done.
+            // 从pendingHandlerCallbackHead开始调用execute 方法，我们在init 方法把addLast 的 context/handler封装为 PendingHandlerAddedTask
             callHandlerAddedForAllHandlers();
         }
     }
@@ -810,6 +829,7 @@ public class DefaultChannelPipeline implements ChannelPipeline {
         return buf.toString();
     }
 
+    //注意看，inbound 对应方法调用都是从头节点开始的
     @Override
     public final ChannelPipeline fireChannelRegistered() {
         AbstractChannelHandlerContext.invokeChannelRegistered(head);
@@ -1339,6 +1359,7 @@ public class DefaultChannelPipeline implements ChannelPipeline {
                 ChannelHandlerContext ctx,
                 SocketAddress remoteAddress, SocketAddress localAddress,
                 ChannelPromise promise) {
+            //最后通过unsafe取connect
             unsafe.connect(remoteAddress, localAddress, promise);
         }
 

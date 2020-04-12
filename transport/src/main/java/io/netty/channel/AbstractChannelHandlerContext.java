@@ -142,6 +142,7 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
 
     @Override
     public ChannelHandlerContext fireChannelRegistered() {
+
         invokeChannelRegistered(findContextInbound(MASK_CHANNEL_REGISTERED));
         return this;
     }
@@ -906,20 +907,24 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
         return false;
     }
 
+    //判断ctx 的executionMask 上如果位为0，表示可以执行对应mask ，然后通过inbound 取&
     private AbstractChannelHandlerContext findContextInbound(int mask) {
         AbstractChannelHandlerContext ctx = this;
         EventExecutor currentExecutor = executor();
         do {
             ctx = ctx.next;
+            //在4.1的这个版本调整为判断mask,比如我们传入mask 为register，only mask_only_inbound
         } while (skipContext(ctx, currentExecutor, mask, MASK_ONLY_INBOUND));
         return ctx;
     }
 
+    //对于需要编码的数据，先进过我们的outbound，然后最后通过Head写出去
     private AbstractChannelHandlerContext findContextOutbound(int mask) {
         AbstractChannelHandlerContext ctx = this;
         EventExecutor currentExecutor = executor();
         do {
             ctx = ctx.prev;
+            //是否跳过 context ，如果为ctx 的handler为 ChannelInboundHandler，对应的executionMask 的第9位到16都是为0
         } while (skipContext(ctx, currentExecutor, mask, MASK_ONLY_OUTBOUND));
         return ctx;
     }
@@ -927,6 +932,12 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
     private static boolean skipContext(
             AbstractChannelHandlerContext ctx, EventExecutor currentExecutor, int mask, int onlyMask) {
         // Ensure we correctly handle MASK_EXCEPTION_CAUGHT which is not included in the MASK_EXCEPTION_CAUGHT
+        // 正常情况 比如ctx handler 为inbound executionMask  为 11111111  （排除MASK_EXCEPTION_CAUGHT ）
+        // onlyMask   MASK_ALL_OUTBOUND = MASK_EXCEPTION_CAUGHT | MASK_ONLY_OUTBOUND  为 111111111111111100000001
+        // mask 以MASK_CONNECT 为例 0000010000000000
+        // onlyMask | mask    1111111100000001 |  0000010000000000   = 1111111100000001
+        // executionMask & (onlyMask | mask)  0000000011111111  & 1111111100000001   等于 0 跳过勒
+        // 以ctx outbound 为例 1111111111111111 1111111100000001  等于 1111111100000001
         return (ctx.executionMask & (onlyMask | mask)) == 0 ||
                 // We can only skip if the EventExecutor is the same as otherwise we need to ensure we offload
                 // everything to preserve ordering.
@@ -968,6 +979,7 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
         // We must call setAddComplete before calling handlerAdded. Otherwise if the handlerAdded method generates
         // any pipeline events ctx.handler() will miss them because the state will not allow it.
         if (setAddComplete()) {
+            //为newChannelContext 中的handler，this 为DefaultChannelHandlerContext
             handler().handlerAdded(this);
         }
     }

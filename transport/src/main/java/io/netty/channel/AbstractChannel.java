@@ -64,14 +64,17 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
 
     /**
      * Creates a new instance.
-     *
+     * 注意 unsafe 就是我们负责我们socket I/O操作，
+     * pipeLine 就是我们无锁化串行的设计（根据不同事件决定从头还是尾遍历链表 ）
      * @param parent
      *        the parent of this channel. {@code null} if there's no parent.
      */
     protected AbstractChannel(Channel parent) {
         this.parent = parent;
         id = newId();
+        //NioSocketChannel 为 NioSocketChannelUnsafe
         unsafe = newUnsafe();
+        //DefaultChannelPipeline(this) ,持有该channel的引用,每一个channel 都持有一个pipeLine并且时自动创建的（new）
         pipeline = newChannelPipeline();
     }
 
@@ -429,6 +432,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
         @Override
         public RecvByteBufAllocator.Handle recvBufAllocHandle() {
             if (recvHandle == null) {
+                //默认为 AdaptiveRecvByteBufAllocator
                 recvHandle = config().getRecvByteBufAllocator().newHandle();
             }
             return recvHandle;
@@ -449,6 +453,11 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
             return remoteAddress0();
         }
 
+        /**
+         * 保存eventLoop 到成员变量，调用register0 这个方法比较重要
+         * @param eventLoop
+         * @param promise
+         */
         @Override
         public final void register(EventLoop eventLoop, final ChannelPromise promise) {
             ObjectUtil.checkNotNull(eventLoop, "eventLoop");
@@ -461,9 +470,10 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                         new IllegalStateException("incompatible event loop type: " + eventLoop.getClass().getName()));
                 return;
             }
-
+            //赋值成员变量EventLoop = nioEventLoop
             AbstractChannel.this.eventLoop = eventLoop;
 
+            //本质判断 singleThreadEventLoop中thread（在调用doStrartThread会赋值 ）变量是否当前线程
             if (eventLoop.inEventLoop()) {
                 register0(promise);
             } else {
@@ -485,6 +495,10 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
             }
         }
 
+        /**
+         * 启动EventLoop (NIO 的selector 可以开始工作勒 )
+         * @param promise
+         */
         private void register0(ChannelPromise promise) {
             try {
                 // check if the channel is still open as it could be closed in the mean time when the register
@@ -493,15 +507,19 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                     return;
                 }
                 boolean firstRegistration = neverRegistered;
+                //把javaChannel 注册到selector上
                 doRegister();
                 neverRegistered = false;
                 registered = true;
 
                 // Ensure we call handlerAdded(...) before we actually notify the promise. This is needed as the
                 // user may already fire events through the pipeline in the ChannelFutureListener.
+                // 注意这里 eventLoop 如果没在当前线程中，线程就会启动执行channelAdded
                 pipeline.invokeHandlerAddedIfNeeded();
 
+                //设置promise 成功
                 safeSetSuccess(promise);
+                //从链表头开始向尾寻找inbound调用ChannelRegistered
                 pipeline.fireChannelRegistered();
                 // Only fire a channelActive if the channel has never been registered. This prevents firing
                 // multiple channel actives if the channel is deregistered and re-registered.

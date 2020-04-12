@@ -73,13 +73,15 @@ public final class ByteBufUtil {
     static final ByteBufAllocator DEFAULT_ALLOCATOR;
 
     static {
+        //默认的内存分配器，判断平台是否为android，是否是采用unpooed 否者 采用pooled
+        // 我们也可以通过系统参数指定 io.netty.allocator.type
         String allocType = SystemPropertyUtil.get(
                 "io.netty.allocator.type", PlatformDependent.isAndroid() ? "unpooled" : "pooled");
         allocType = allocType.toLowerCase(Locale.US).trim();
 
         ByteBufAllocator alloc;
         if ("unpooled".equals(allocType)) {
-            alloc = UnpooledByteBufAllocator.DEFAULT;
+            alloc = UnpooledByteBufAllocator.DEFAULT; //堆内存分配器
             logger.debug("-Dio.netty.allocator.type: {}", allocType);
         } else if ("pooled".equals(allocType)) {
             alloc = PooledByteBufAllocator.DEFAULT;

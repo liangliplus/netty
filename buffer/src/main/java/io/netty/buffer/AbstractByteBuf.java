@@ -68,12 +68,16 @@ public abstract class AbstractByteBuf extends ByteBuf {
     static final ResourceLeakDetector<ByteBuf> leakDetector =
             ResourceLeakDetectorFactory.instance().newResourceLeakDetector(ByteBuf.class);
 
-    int readerIndex;
-    int writerIndex;
-    private int markedReaderIndex;
-    private int markedWriterIndex;
+    int readerIndex;//读指针
+    int writerIndex;//写指针
+    private int markedReaderIndex;//标记之前的readerIndex ，后续可以通过resetReaderIndex 恢复到原来readerIndex 位置
+    private int markedWriterIndex;//标记之前writerIndex
     private int maxCapacity;
 
+    /**
+     * 理解读写区间Api，具体读写API
+     * @param maxCapacity
+     */
     protected AbstractByteBuf(int maxCapacity) {
         checkPositiveOrZero(maxCapacity, "maxCapacity");
         this.maxCapacity = maxCapacity;
@@ -153,11 +157,20 @@ public abstract class AbstractByteBuf extends ByteBuf {
         return this;
     }
 
+    /**
+     * 是否可读，判断写指针大于读指针
+     * @return
+     */
     @Override
     public boolean isReadable() {
         return writerIndex > readerIndex;
     }
 
+    /**
+     * 是否还有指针数量的可读区间
+     * @param numBytes
+     * @return
+     */
     @Override
     public boolean isReadable(int numBytes) {
         return writerIndex - readerIndex >= numBytes;
@@ -297,12 +310,14 @@ public abstract class AbstractByteBuf extends ByteBuf {
                     writerIndex, minWritableBytes, maxCapacity, this));
         }
 
+        //使目标容量为2次幂
         // Normalize the target capacity to the power of 2.
         final int fastWritable = maxFastWritableBytes();
         int newCapacity = fastWritable >= minWritableBytes ? writerIndex + fastWritable
                 : alloc().calculateNewCapacity(targetCapacity, maxCapacity);
 
         // Adjust to the new capacity.
+        // 扩容
         capacity(newCapacity);
     }
 
@@ -726,6 +741,11 @@ public abstract class AbstractByteBuf extends ByteBuf {
         return bytes.length;
     }
 
+    /**
+     * _getByte(i) ,然后赋值对应readerIndex = readerIndex + type_length 比如 byte 1字节
+     * readerIndex = readerIndex + 1 每次只读1字节
+     * @return
+     */
     @Override
     public byte readByte() {
         checkReadableBytes0(1);

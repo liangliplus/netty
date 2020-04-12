@@ -79,6 +79,16 @@ public final class UnpooledByteBufAllocator extends AbstractByteBufAllocator imp
 
     @Override
     protected ByteBuf newHeapBuffer(int initialCapacity, int maxCapacity) {
+        /**
+         * 判断平台是否支持unsafe， unsafe 直接操作内存地址值，相对操作内存更快
+         * 理解unsafe 和 非unsafe Heap分配区别
+         * 对于非池化。如果百万连接请求，如果每次连接消耗 4k，
+         * 在创建时没区别，都是调用父类创建一个空数组赋值给array 和 设置readerIndex 和 writerIndex 初始值
+         * 区别在_getXXX 和 _setXXX
+         * HeapByteBufUtil.getByte(array, index)，UnsafeByteBufUtil.getByte(array, index)
+         * InstrumentedUnpooledHeapByteBuf 本质上就是设置对应下标值，获取值就是获取对应下标值
+         * InstrumentedUnpooledUnsafeHeapByteBuf 通过java 底层的unsafe 可以直接获取属性的内存地址值，和put ，get，cas 等操作
+         */
         return PlatformDependent.hasUnsafe() ?
                 new InstrumentedUnpooledUnsafeHeapByteBuf(this, initialCapacity, maxCapacity) :
                 new InstrumentedUnpooledHeapByteBuf(this, initialCapacity, maxCapacity);

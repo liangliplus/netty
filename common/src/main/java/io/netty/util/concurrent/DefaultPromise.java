@@ -178,7 +178,8 @@ public class DefaultPromise<V> extends AbstractFuture<V> implements Promise<V> {
         synchronized (this) {
             addListener0(listener);
         }
-
+        //通知前，会判断result的状态，这个result的状态可以在netty 处理过程中设置
+        //如果执行完成，就会通知监听者
         if (isDone()) {
             notifyListeners();
         }

@@ -23,7 +23,9 @@ final class DefaultChannelHandlerContext extends AbstractChannelHandlerContext {
 
     DefaultChannelHandlerContext(
             DefaultChannelPipeline pipeline, EventExecutor executor, String name, ChannelHandler handler) {
+        //抽象类中保存pipeLine executor ，handlerClass 和 mask，以及双向链表
         super(pipeline, executor, name, handler.getClass());
+        //存储传入handler
         this.handler = handler;
     }
 

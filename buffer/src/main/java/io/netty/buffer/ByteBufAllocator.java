@@ -26,6 +26,7 @@ public interface ByteBufAllocator {
     /**
      * Allocate a {@link ByteBuf}. If it is a direct or heap buffer
      * depends on the actual implementation.
+     * 分配byteBuf ，它是 直接内存或堆内存以来具体的实现
      */
     ByteBuf buffer();
 
@@ -44,6 +45,7 @@ public interface ByteBufAllocator {
 
     /**
      * Allocate a {@link ByteBuf}, preferably a direct buffer which is suitable for I/O.
+     * 分配byteBuf，仅可能是堆外内存，不支持则使用堆内存
      */
     ByteBuf ioBuffer();
 
@@ -92,6 +94,7 @@ public interface ByteBufAllocator {
     /**
      * Allocate a {@link CompositeByteBuf}.
      * If it is a direct or heap buffer depends on the actual implementation.
+     * 组合分配，把多个byteBuf 合并成一个整体
      */
     CompositeByteBuf compositeBuffer();
 

@@ -52,7 +52,7 @@ final class ChannelHandlerMask {
     static final int MASK_DEREGISTER = 1 << 13;
     static final int MASK_READ = 1 << 14;
     static final int MASK_WRITE = 1 << 15;
-    static final int MASK_FLUSH = 1 << 16;
+    static final int MASK_FLUSH = 1 << 16;//1000000000000000
 
     static final int MASK_ONLY_INBOUND =  MASK_CHANNEL_REGISTERED |
             MASK_CHANNEL_UNREGISTERED | MASK_CHANNEL_ACTIVE | MASK_CHANNEL_INACTIVE | MASK_CHANNEL_READ |
@@ -92,8 +92,12 @@ final class ChannelHandlerMask {
         int mask = MASK_EXCEPTION_CAUGHT;
         try {
             if (ChannelInboundHandler.class.isAssignableFrom(handlerType)) {
+                /**
+                 * 如果这个类型为inbound，位上存在8个1，默认是 11111111，在后续于AbstractChannelContext 的executionMask 取&  不会返回0
+                 * 并且能执行ctx 对应方法
+                 */
                 mask |= MASK_ALL_INBOUND;
-
+                //是否跳过，取决该方法不为空 并且标记勒skip 注解
                 if (isSkippable(handlerType, "channelRegistered", ChannelHandlerContext.class)) {
                     mask &= ~MASK_CHANNEL_REGISTERED;
                 }
@@ -151,7 +155,7 @@ final class ChannelHandlerMask {
                     mask &= ~MASK_FLUSH;
                 }
             }
-
+            //注意这一行，比如channelInbound这里返回是0
             if (isSkippable(handlerType, "exceptionCaught", ChannelHandlerContext.class, Throwable.class)) {
                 mask &= ~MASK_EXCEPTION_CAUGHT;
             }

@@ -151,6 +151,7 @@ public class AdaptiveRecvByteBufAllocator extends DefaultMaxMessagesRecvByteBufA
      * Creates a new predictor with the default parameters.  With the default
      * parameters, the expected buffer size starts from {@code 1024}, does not
      * go down below {@code 64}, and does not go up above {@code 65536}.
+     * 预期buffer开始大小是1024，不在64下，不在65536上
      */
     public AdaptiveRecvByteBufAllocator() {
         this(DEFAULT_MINIMUM, DEFAULT_INITIAL, DEFAULT_MAXIMUM);
@@ -192,6 +193,7 @@ public class AdaptiveRecvByteBufAllocator extends DefaultMaxMessagesRecvByteBufA
     @SuppressWarnings("deprecation")
     @Override
     public Handle newHandle() {
+        //
         return new HandleImpl(minIndex, maxIndex, initial);
     }
 

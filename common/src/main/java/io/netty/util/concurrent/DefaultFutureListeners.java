@@ -18,7 +18,7 @@ package io.netty.util.concurrent;
 import java.util.Arrays;
 
 final class DefaultFutureListeners {
-
+    //就只有一个opertionComplete
     private GenericFutureListener<? extends Future<?>>[] listeners;
     private int size;
     private int progressiveSize; // the number of progressive listeners

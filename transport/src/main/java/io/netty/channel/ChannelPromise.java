@@ -21,6 +21,9 @@ import io.netty.util.concurrent.Promise;
 
 /**
  * Special {@link ChannelFuture} which is writable.
+ * 扩展勒ChannelFutrue 和 Promise
+ * ChannelFutrue  与channel 建立勒关系和具备设置监听功能
+ * Promise 可以异步设置执行结果
  */
 public interface ChannelPromise extends ChannelFuture, Promise<Void> {
 
