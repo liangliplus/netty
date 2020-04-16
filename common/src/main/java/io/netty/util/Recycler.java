@@ -159,6 +159,7 @@ public abstract class Recycler<T> {
             return newObject((Handle<T>) NOOP_HANDLE);
         }
         Stack<T> stack = threadLocal.get();
+        //从栈弹出handler
         DefaultHandle<T> handle = stack.pop();
         if (handle == null) {
             handle = stack.newHandle();

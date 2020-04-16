@@ -104,6 +104,8 @@ public class LineBasedFrameDecoder extends ByteToMessageDecoder {
                 final int delimLength = buffer.getByte(eol) == '\r'? 2 : 1;
 
                 if (length > maxLength) {
+                    //把读指针指向 eol + delimLength ，也就是指向把读指针指向换行符位置
+                    // ，相当于换行符之前全部丢弃（因为大于最大长度）
                     buffer.readerIndex(eol + delimLength);
                     fail(ctx, length);
                     return null;
@@ -117,7 +119,7 @@ public class LineBasedFrameDecoder extends ByteToMessageDecoder {
                 }
 
                 return frame;
-            } else {
+            } else {//没有找到换行符
                 final int length = buffer.readableBytes();
                 if (length > maxLength) {
                     discardedBytes = length;

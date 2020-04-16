@@ -103,6 +103,7 @@ public abstract class ReferenceCountUpdater<T extends ReferenceCounted> {
      * Resets the reference count to 1
      */
     public final void resetRefCnt(T instance) {
+        //原子行更新 JUC 的AtomicFiled
         updater().set(instance, initialValue());
     }
 

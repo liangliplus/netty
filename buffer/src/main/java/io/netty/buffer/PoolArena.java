@@ -143,7 +143,12 @@ abstract class PoolArena<T> implements PoolArenaMetric {
     abstract boolean isDirect();
 
     PooledByteBuf<T> allocate(PoolThreadCache cache, int reqCapacity, int maxCapacity) {
+        //获取一个buf
         PooledByteBuf<T> buf = newByteBuf(maxCapacity);
+        /**
+         *在线程私有的 PoolThreadCache 中分配一块内存，有两种情况，从缓冲中进行内存分配和在堆中进行内存分配
+         * 注意netty 把内存划分不同规格，比如 512byte tiny  , small , normal
+         */
         allocate(cache, buf, reqCapacity);
         return buf;
     }
@@ -172,20 +177,48 @@ abstract class PoolArena<T> implements PoolArenaMetric {
         return (normCapacity & 0xFFFFFE00) == 0;
     }
 
+    /**
+     * netty 为了更高效管理内存，避免内存浪费，把内存划分为不同规则
+     * 比如 tiny 0-512 byte
+     * small 512byte -  8kb
+     * normal 8kb - 16m
+     * huge 大于 16m的对象
+     * netty 所有内存 申请以Chunk 为单位的内存申请，大小为16m，后续所有分配都是在这个Chunk 里面操作
+     * 8k 对应一个page ，一个Chunk 会以Page 为单位进行切分，一个Chunk 被划分为 2048个Page，小于8kb 对应SubPage
+     * 例如我们申请一段内存空间只要1k，却分配8k ，存在内存浪费，所以在把page划分，节省空间
+     *  |                                                                   |
+     *  |   tiny          |       small     |       normal|    huge         |
+     *  |                 |                 |             |                 |
+     *  +-------------------------------------------------------------------+
+     *  0                 512Byte           8kb           16mb
+     *      |                             |
+     *      +-----------------------------+
+     *              SubPage
+     * DEFAULT_TINY_CACHE_SIZE = SystemPropertyUtil.getInt("io.netty.allocator.tinyCacheSize", 512);
+     * EFAULT_SMALL_CACHE_SIZE = SystemPropertyUtil.getInt("io.netty.allocator.smallCacheSize", 256);
+     * DEFAULT_NORMAL_CACHE_SIZE = SystemPropertyUtil.getInt("io.netty.allocator.normalCacheSize", 64);
+     * @param cache
+     * @param buf
+     * @param reqCapacity
+     */
     private void allocate(PoolThreadCache cache, PooledByteBuf<T> buf, final int reqCapacity) {
+        //为请求容量赋值合适大小
         final int normCapacity = normalizeCapacity(reqCapacity);
-        if (isTinyOrSmall(normCapacity)) { // capacity < pageSize
+        //如果是tiny 或者small ，判断normCapacity 是否小于8k
+        if (isTinyOrSmall(normCapacity)) { // capacity < pageSize  小于8k
             int tableIdx;
             PoolSubpage<T>[] table;
+            //判断是否是tiny
             boolean tiny = isTiny(normCapacity);
             if (tiny) { // < 512
+                //是tiny ，通过allocateTiny 分配大小
                 if (cache.allocateTiny(this, buf, reqCapacity, normCapacity)) {
                     // was able to allocate out of the cache so move on
                     return;
                 }
                 tableIdx = tinyIdx(normCapacity);
                 table = tinySubpagePools;
-            } else {
+            } else {//small
                 if (cache.allocateSmall(this, buf, reqCapacity, normCapacity)) {
                     // was able to allocate out of the cache so move on
                     return;
@@ -338,11 +371,11 @@ abstract class PoolArena<T> implements PoolArenaMetric {
 
     int normalizeCapacity(int reqCapacity) {
         checkPositiveOrZero(reqCapacity, "reqCapacity");
-
+        //大对象直接返回
         if (reqCapacity >= chunkSize) {
             return directMemoryCacheAlignment == 0 ? reqCapacity : alignCapacity(reqCapacity);
         }
-
+        // 大于512（大于tiny ），也就是normal
         if (!isTiny(reqCapacity)) { // >= 512
             // Doubled
 
@@ -367,11 +400,11 @@ abstract class PoolArena<T> implements PoolArenaMetric {
             return alignCapacity(reqCapacity);
         }
 
-        // Quantum-spaced
+        // Quantum-spaced   如果是16的整数倍，我们知道tiny 把chunk 分配为32 个 16整数倍的规格
         if ((reqCapacity & 15) == 0) {
             return reqCapacity;
         }
-
+        //如果请求容量不是16的整数倍，获取一个大于请求容量最接近16整数倍的规格（节省内存）
         return (reqCapacity & ~15) + 16;
     }
 
@@ -771,6 +804,7 @@ abstract class PoolArena<T> implements PoolArenaMetric {
 
         @Override
         protected PooledByteBuf<ByteBuffer> newByteBuf(int maxCapacity) {
+            //判断是否支持unsafe
             if (HAS_UNSAFE) {
                 return PooledUnsafeDirectByteBuf.newInstance(maxCapacity);
             } else {

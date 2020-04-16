@@ -48,6 +48,7 @@ final class PoolThreadCache {
     final PoolArena<ByteBuffer> directArena;
 
     // Hold the caches for the different size classes, which are tiny, small and normal.
+    // 不同size的cache 实在创建对象时指定，请看 createSubPageCaches
     private final MemoryRegionCache<byte[]>[] tinySubPageHeapCaches;
     private final MemoryRegionCache<byte[]>[] smallSubPageHeapCaches;
     private final MemoryRegionCache<ByteBuffer>[] tinySubPageDirectCaches;
@@ -74,6 +75,18 @@ final class PoolThreadCache {
         this.heapArena = heapArena;
         this.directArena = directArena;
         if (directArena != null) {
+            /**
+             * tinyCacheSize = 512, numTinySubpagePools 为 32，tinySubPageDirectCaches 中每个元素维护一个队列
+             * 队列中大小（容量）由 tinyCacheSize 指定 ，每个队列元素byteBuf 长度一样，注意 但是数据中对于SubPageCaches规格是不一样
+             * 比如 tiny 中 ，netty 将数组长度分为32，也就是32个不同规格，都是16的整数倍，
+             * 比如0b ， 16 byte  32 byte  48byte  64byte 80byte .... 496byte 总共32种规格
+             * 每一个规格代表 数组中一个缓存对象大小， 比如tinySubPageDirectCaches[1]  16byte ， tinySubPageDirectCaches[2] 32byte
+             * 数组中规格的大小取决于 directArena.numXXXSubPagePools
+             * TODO small 和 normal 规格分析
+             * small:4 种规格, 512Byte, 1KB, 2KB, 4KB；
+             * normal:3 种规格, 8KB, 16KB，32KB。
+             *
+             */
             tinySubPageDirectCaches = createSubPageCaches(
                     tinyCacheSize, PoolArena.numTinySubpagePools, SizeClass.Tiny);
             smallSubPageDirectCaches = createSubPageCaches(
@@ -161,6 +174,7 @@ final class PoolThreadCache {
      * Try to allocate a tiny buffer out of the cache. Returns {@code true} if successful {@code false} otherwise
      */
     boolean allocateTiny(PoolArena<?> area, PooledByteBuf<?> buf, int reqCapacity, int normCapacity) {
+        //cacheForTiny 拿到tiny 对应的缓存下标对应内存，就是请求容量 除以16( >>> 4)
         return allocate(cacheForTiny(area, normCapacity), buf, reqCapacity);
     }
 
@@ -184,6 +198,7 @@ final class PoolThreadCache {
             // no cache found so just return false here
             return false;
         }
+        //真正的分配内存的地方
         boolean allocated = cache.allocate(buf, reqCapacity, this);
         if (++ allocations >= freeSweepAllocationThreshold) {
             allocations = 0;

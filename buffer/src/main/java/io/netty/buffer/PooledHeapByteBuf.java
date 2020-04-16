@@ -30,12 +30,15 @@ class PooledHeapByteBuf extends PooledByteBuf<byte[]> {
             new ObjectCreator<PooledHeapByteBuf>() {
         @Override
         public PooledHeapByteBuf newObject(Handle<PooledHeapByteBuf> handle) {
+            //创建一个默认的  ，handler 为DefaultHandle
             return new PooledHeapByteBuf(handle, 0);
         }
     });
 
     static PooledHeapByteBuf newInstance(int maxCapacity) {
+        //最后会调用creator 创建 PooledHeapByteBuf
         PooledHeapByteBuf buf = RECYCLER.get();
+        //重用恢复初始状态，比如读写指针和 mark，最大容量，引用计数
         buf.reuse(maxCapacity);
         return buf;
     }

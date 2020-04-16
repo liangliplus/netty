@@ -73,6 +73,7 @@ public class FixedLengthFrameDecoder extends ByteToMessageDecoder {
         if (in.readableBytes() < frameLength) {
             return null;
         } else {
+            //返回读取指定长度字节  readRetainedSlice 返回一个新截取的byteBuf
             return in.readRetainedSlice(frameLength);
         }
     }

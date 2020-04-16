@@ -243,6 +243,7 @@ public class PooledByteBufAllocator extends AbstractByteBufAllocator implements 
                                   int tinyCacheSize, int smallCacheSize, int normalCacheSize,
                                   boolean useCacheForAllThreads, int directMemoryCacheAlignment) {
         super(preferDirect);//preferDirect 根据这个判断是否使用堆外内存
+        //内存池的缓存 注意 io.netty.buffer.PooledByteBufAllocator.PoolThreadLocalCache.initialValue 方法
         threadCache = new PoolThreadLocalCache(useCacheForAllThreads);
         this.tinyCacheSize = tinyCacheSize;
         this.smallCacheSize = smallCacheSize;
@@ -339,6 +340,7 @@ public class PooledByteBufAllocator extends AbstractByteBufAllocator implements 
         PoolArena<byte[]> heapArena = cache.heapArena;
 
         final ByteBuf buf;
+
         if (heapArena != null) {
             buf = heapArena.allocate(cache, initialCapacity, maxCapacity);
         } else {
@@ -353,9 +355,11 @@ public class PooledByteBufAllocator extends AbstractByteBufAllocator implements 
     @Override
     protected ByteBuf newDirectBuffer(int initialCapacity, int maxCapacity) {
         PoolThreadCache cache = threadCache.get();
+        //获取cache 成员变量
         PoolArena<ByteBuffer> directArena = cache.directArena;
 
         final ByteBuf buf;
+        //命中缓存的分配逻辑
         if (directArena != null) {
             buf = directArena.allocate(cache, initialCapacity, maxCapacity);
         } else {
@@ -468,7 +472,9 @@ public class PooledByteBufAllocator extends AbstractByteBufAllocator implements 
 
         @Override
         protected synchronized PoolThreadCache initialValue() {
+            //获取最少使用堆内存区域
             final PoolArena<byte[]> heapArena = leastUsedArena(heapArenas);
+            //获取最少使用直接内存区域
             final PoolArena<ByteBuffer> directArena = leastUsedArena(directArenas);
 
             final Thread current = Thread.currentThread();
@@ -487,6 +493,7 @@ public class PooledByteBufAllocator extends AbstractByteBufAllocator implements 
                 return cache;
             }
             // No caching so just use 0 as sizes.
+            // 返回一个内存缓冲对象
             return new PoolThreadCache(heapArena, directArena, 0, 0, 0, 0, 0);
         }
 
